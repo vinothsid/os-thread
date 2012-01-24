@@ -101,38 +101,38 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	}	
 	
 	DNODE newNode = createNode();
-	print("Before queueLock\n");
+	//print("Before queueLock\n");
 	futex_down(&queueLock);
 	enqueue(newNode);
 
-	print("After queueLock release\n");	
+	//print("After queueLock release\n");	
 	//creating task struct below
 	struct task *t = (struct task *)malloc(sizeof(struct task));
 	t->func=start_func;
 	t->arg=(void *)arg;
 	t->qPos=newNode;
 	//end
-	print("After initialising task\n");
+	//print("After initialising task\n");
 	
 	*new_thread_ID = clone(&mythread_wrapper,getMember(newNode,stackPtr)+STACK_SIZE,SIGCHLD|CLONE_VM,(void *)(t));
 
 	
-	print("Wrapper cloned\n");	
+	//print("Wrapper cloned\n");	
 	futex_up(&queueLock);
 	return 0;
 }
 
 
 int mythread_wrapper(void *t) {
-	print("Inside wrapper\n");
+	//print("Inside wrapper\n");
 	struct task* tWrapper=(struct task*)t;
 	getMember(tWrapper->qPos,threadId)=mythread_self();
 	getMember(tWrapper->qPos,state)=RUNNABLE;
 	futex_down(&queueLock);	
 	if((qHead == idleNode) ) {
 		//ALREADY_UP=1;
-		if(qHead->next==idleNode) //{
-			qHead=tWrapper->qPos;
+		//if(qHead->next==idleNode) //{
+		//	qHead=tWrapper->qPos;
 		futex_up(&(getMember(idleNode,selfLock)));
 		//}
 	}	
@@ -148,6 +148,8 @@ int mythread_wrapper(void *t) {
 	//exit(1);
 	futex_down(&queueLock);
 	dequeue();
+	//below ensures that idleNode lock is released only when 
+	//the only node remaining is idleNode;;
 	if(qHead->next!=qHead)
 		futex_up(&getMember(idleNode,selfLock));
 	//qHead=qHead->next; //done in dequeu;
@@ -282,6 +284,10 @@ void* sayHello3() {
 	print("I say hello3\n");
 }
 
+void* sayHello6() {
+	print("I say hello66\n");
+	//exit(1);
+}
 int main() {
 	/*
 	DNODE node1 = createNode();
@@ -316,6 +322,8 @@ int main() {
 	mythread_create(&tid2,NULL,sayHello2,NULL);
 	mythread_create(&tid3,NULL,sayHello3,NULL);
 	mythread_create(&tid1,NULL,sayHello,NULL);
+//	sleep(9);
+	mythread_create(&tid1,NULL,sayHello6,NULL);
 	while(1) {}
 //	waitpid(tid1,0,0);
 	
