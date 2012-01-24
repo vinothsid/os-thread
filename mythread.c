@@ -22,6 +22,8 @@ int mythread_yield() {
 		print("here in else\n");
 		//DNODE temp=qHead;
 		qHead=qHead->next;
+		if(qHead==idleNode)
+			ALREADY_UP=1; 
 		futex_up(&(getMember(qHead,selfLock)));
 		futex_up(&queueLock);
 		futex_down(&(getMember(temp,selfLock)));		
@@ -44,10 +46,11 @@ int idleFunc() {
         DNODE toBeRun;
 	while(getppid()) {
 		//sleep(1);
-		
-		futex_down(&(getMember(idleNode,selfLock)));
-		futex_down(&queueLock);
 		print("In idle thread\n");
+		futex_down(&(getMember(idleNode,selfLock)));
+		print("In idle thread after idleNode lock release\n");
+		futex_down(&queueLock);
+		print("In idle thread after lock acquire\n");
 		//qHead=qHead->next;	
 		ALREADY_UP=0;
         	qHead=searchRunnable();
@@ -125,7 +128,7 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	futex_down(&queueLock);
 	enqueue(newNode);
 
-	print("After queueLock release\n");	
+	print("After queueLock acquire in create_thread\n");	
 	//creating task struct below
 	struct task *t = (struct task *)malloc(sizeof(struct task));
 	t->func=start_func;
@@ -148,12 +151,14 @@ int mythread_wrapper(void *t) {
 	struct task* tWrapper=(struct task*)t;
 	getMember(tWrapper->qPos,threadId)=mythread_self();
 	getMember(tWrapper->qPos,state)=RUNNABLE;
-	futex_down(&queueLock);	
-	if((qHead == idleNode) ) {
-		//ALREADY_UP=1;
+	futex_down(&queueLock);
+	print("wrapper acquired queueLock\n");	
+	if((qHead == idleNode) &&(!ALREADY_UP)) {
+		ALREADY_UP=1;
 		//if(qHead->next==idleNode) //{
 		//	qHead=tWrapper->qPos;
 		futex_up(&(getMember(idleNode,selfLock)));
+		print("released idleNode lock\n");
 		//}
 	}	
 	futex_up(&queueLock);	
@@ -170,8 +175,10 @@ int mythread_wrapper(void *t) {
 	dequeue();
 	//below ensures that idleNode lock is released only when 
 	//the only node remaining is idleNode;;
-	if(qHead->next!=qHead)
+	if(qHead->next!=qHead) {
 		futex_up(&getMember(idleNode,selfLock));
+		print("idleNode lock released in wrapper if condition\n");
+	}
 	//qHead=qHead->next; //done in dequeu;
 	futex_up(&queueLock);
 	//futex_up(&schedulerLock);
