@@ -133,7 +133,7 @@ int mythread_wrapper(void *t) {
 		//ALREADY_UP=1;
 		if(qHead->next==idleNode) //{
 			qHead=tWrapper->qPos;
-			futex_up(&(getMember(idleNode,selfLock)));
+		futex_up(&(getMember(idleNode,selfLock)));
 		//}
 	}	
 	futex_up(&queueLock);	
