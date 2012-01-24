@@ -25,13 +25,15 @@
 #define STACK_SIZE 64*1024
 #define getMember(node,member) ((struct thread *)((node)->data))->member
 
+
 /* Keys for thread-specific data */
 typedef unsigned int mythread_key_t;
+typedef unsigned int mythread_attr_t;
 typedef unsigned int mythread_t;
 DNODE qHead;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
-
+struct futex schedulerLock;
 /* add your code here */
 
 struct thread {
@@ -41,13 +43,13 @@ struct thread {
 	char* stackPtr; //needed to free stack later;
 	DNODE joinQ; //queue of threads waiting on this thread;
 	int exitStatus;
-}
+};
 
 struct task {
-	void (*func)();//user func to be executed;
-	void *args;    //arguments for user func;
-	struct node *qPos;//position in the thread queue; pointer to self;
-}
+	void* (*func)();//user func to be executed;
+	void *arg;    //arguments for user func;
+	DNODE qPos;//position in the thread queue; pointer to self;
+};
 
 /*
 *thread library initialization
@@ -57,7 +59,7 @@ int initThread();
 /*
 *this function is used as a wrapper to call the user function
 */
-int mythread_wrapper(struct task);
+int mythread_wrapper(void *);
 
 /*
 *scheduler thread: schedules next thread to run. It schedules an idle thread when 
@@ -77,6 +79,9 @@ int enqueue(DNODE);
 
 /*
 * Creates and initialises the node to be joined in run Q
+* initializes the struct thread associated with each thread started
+* by the mythread library
+* sets state as CREATED in the thread struct
 */
 DNODE createNode();
 
