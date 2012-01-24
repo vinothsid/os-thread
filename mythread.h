@@ -28,6 +28,8 @@
 /* Keys for thread-specific data */
 typedef unsigned int mythread_key_t;
 typedef unsigned int mythread_t;
+typedef unsigned int mythread_attr_t;
+
 DNODE qHead;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
@@ -41,13 +43,13 @@ struct thread {
 	char* stackPtr; //needed to free stack later;
 	DNODE joinQ; //queue of threads waiting on this thread;
 	int exitStatus;
-}
+};
 
 struct task {
 	void (*func)();//user func to be executed;
 	void *args;    //arguments for user func;
-	struct node *qPos;//position in the thread queue; pointer to self;
-}
+	DNODE qPos;//position in the thread queue; pointer to self;
+};
 
 /*
 *thread library initialization
@@ -96,6 +98,16 @@ DNODE search(int threadId);
 int compare(DNODE,void *);
 
 /*
+* Search for first Runnable thread in the run Q 
+*/
+DNODE searchRunnable();
+
+/* Helper function for searchRunnable
+*
+*/
+int compareState(DNODE n,void *d);
+
+/*
 * Sets the state of all threads in Join Q RUNNABLE 
 */
 int wake();
@@ -120,10 +132,7 @@ mythread_t mythread_self(void);
  * Threads are activated (run) according to the number of available LWPs
  * or are marked as ready.
  */
-int mythread_create(mythread_t *new_thread_ID,
-		    mythread_attr_t *attr,
-		    void * (*start_func)(void *),
-		    void *arg);
+int mythread_create(mythread_t *new_thread_ID, mythread_attr_t *attr, void * (*start_func)(void *), void *arg);
 
 /*
  * mythread_yield - switch from running thread to the next ready one
