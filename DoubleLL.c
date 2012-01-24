@@ -21,6 +21,7 @@ int dllInsert(DNODE prevNode , DNODE newNode) {
 	}
 }
 
+// The n->data has to be deleted before calling dllDelete
 int dllDelete(DNODE n , DNODE *head ) {
 //	DNODE n = *node;
 	if (n==NULL) {

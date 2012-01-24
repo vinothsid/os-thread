@@ -13,6 +13,7 @@
 #define TRUE 1
 #endif
 
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include "futex.h"
 #include "DoubleLL.h"
@@ -25,12 +26,13 @@
 #define STACK_SIZE 64*1024
 #define getMember(node,member) ((struct thread *)((node)->data))->member
 
-
 /* Keys for thread-specific data */
 typedef unsigned int mythread_key_t;
 typedef unsigned int mythread_attr_t;
 typedef unsigned int mythread_t;
-DNODE qHead;
+typedef unsigned int mythread_attr_t;
+
+DNODE qHead, idleNode;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
 struct futex schedulerLock;
@@ -50,6 +52,11 @@ struct task {
 	void *arg;    //arguments for user func;
 	DNODE qPos;//position in the thread queue; pointer to self;
 };
+/*
+*call to get process id or thread id
+*/
+
+static pid_t gettid(void);
 
 /*
 *thread library initialization
@@ -70,7 +77,7 @@ int scheduler();
 /*
 *idle thread: scheduled by scheduler when there is no active thread
 */
-int idleThread();
+int idleFunc();
 
 /*
 * Enqueues thread in the run Q
@@ -101,6 +108,16 @@ DNODE search(int threadId);
 int compare(DNODE,void *);
 
 /*
+* Search for first Runnable thread in the run Q 
+*/
+DNODE searchRunnable();
+
+/* Helper function for searchRunnable
+*
+*/
+int compareState(DNODE n,void *d);
+
+/*
 * Sets the state of all threads in Join Q RUNNABLE 
 */
 int wake();
@@ -125,10 +142,7 @@ mythread_t mythread_self(void);
  * Threads are activated (run) according to the number of available LWPs
  * or are marked as ready.
  */
-int mythread_create(mythread_t *new_thread_ID,
-		    mythread_attr_t *attr,
-		    void * (*start_func)(void *),
-		    void *arg);
+int mythread_create(mythread_t *new_thread_ID, mythread_attr_t *attr, void * (*start_func)(void *), void *arg);
 
 /*
  * mythread_yield - switch from running thread to the next ready one
