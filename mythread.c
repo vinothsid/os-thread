@@ -10,7 +10,7 @@ int INIT_ONCE=1;
 int scheduler() {
 	while(getppid()) {
 		futex_down(&queueLock);
-		DNODE toBeRun=NULL;//=searchRunnable();	
+		DNODE toBeRun=searchRunnable();	
 		futex_up(&queueLock);
 		futex_up(&getMember(toBeRun,selfLock));
 		futex_down(&schedulerLock);
