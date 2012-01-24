@@ -15,16 +15,102 @@
 
 #include <sys/types.h>
 #include "futex.h"
+#include "DoubleLL.h"
 
+#define RUNNABLE 1
+#define DEAD 0
+#define WAIT 2
+#define CREATED 3
+
+#define STACK_SIZE 64*1024
 /* Keys for thread-specific data */
 typedef unsigned int mythread_key_t;
+typedef unsigned int mythread_t;
+DNODE qHead;
+struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
+int INIT_ONCE;
 
 /* add your code here */
+
+struct thread {
+	int state; //CREATED,RUNNABLE, WAIT, DEAD;;
+	int threadId;
+	struct futex selfLock;
+	char* stackPtr; //needed to free stack later;
+	DNODE joinQ; //queue of threads waiting on this thread;
+	int exitStatus;
+}
+
+struct task {
+	void (*func)();//user func to be executed;
+	void *args;    //arguments for user func;
+	struct node *qPos;//position in the thread queue; pointer to self;
+}
+
+/*
+*thread library initialization
+*initializes queueLock,scheduler thread and idle thread
+*/
+int initThread();
+/*
+*this function is used as a wrapper to call the user function
+*/
+int mythread_wrapper(struct task);
+
+/*
+*scheduler thread: schedules next thread to run. It schedules an idle thread when 
+*there is no ready process
+*/
+int scheduler();
+
+/*
+*idle thread: scheduled by scheduler when there is no active thread
+*/
+int idleThread();
+
+/*
+* Enqueues thread in the run Q
+*/
+int enqueue(DNODE);
+
+/*
+* Creates and initialises the node to be joined in run Q
+*/
+DNODE createNode();
+
+/*
+* Deques the node in the head of run Q
+*/
+int dequeue();
+
+/*
+* Search for the threadId in the run Q and return the node
+*/
+DNODE search(int threadId);
+
+/*Compare helper function for search()
+*
+*/
+int compare(DNODE,void *);
+
+/*
+* Sets the state of all threads in Join Q RUNNABLE 
+*/
+int wake();
+
+/*
+* Join the calling thread Node(pointed by head) to join Q of target thread 
+*/
+int joinQ(mythread_t );
 
 /*
  * mythread_self - thread id of running thread
  */
 mythread_t mythread_self(void);
+
+/*
+*
+*/
 
 /*
  * mythread_create - prepares context of new_thread_ID as start_func(arg),
