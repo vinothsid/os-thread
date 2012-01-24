@@ -9,6 +9,26 @@ int ALREADY_UP=0;
 int INIT_ONCE=1;
 DNODE qHead = NULL;
 DNODE idleNode = NULL;
+
+
+int mythread_yield() {
+	futex_down(&queueLock);
+	DNODE temp=qHead;
+	if(temp->next->next == temp) {
+		//futex_up(&(getMember(idleNode,selfLock)));
+		print("here in if\n");
+		futex_up(&queueLock);
+	} else {
+		print("here in else\n");
+		//DNODE temp=qHead;
+		qHead=qHead->next;
+		futex_up(&(getMember(qHead,selfLock)));
+		futex_up(&queueLock);
+		futex_down(&(getMember(temp,selfLock)));		
+	}
+	return 0;
+}
+
 void mythread_exit(void* retVal) {
 	
 	*((int*)retVal)=0;
@@ -75,7 +95,7 @@ int initThread() {
 	getMember(idleNode,state) = RUNNABLE;
 	qHead=idleNode;	
 	//char* idleStack=malloc(STACK_SIZE);
-	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
+	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM,0);
 	//getMember(idleNode,threadId) = clone(idleFunc,idleStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
 //	char* schedStack=malloc(STACK_SIZE);
 //	mythread_t schedId=clone(scheduler,schedStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
@@ -105,7 +125,7 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	futex_down(&queueLock);
 	enqueue(newNode);
 
-	//print("After queueLock release\n");	
+	print("After queueLock release\n");	
 	//creating task struct below
 	struct task *t = (struct task *)malloc(sizeof(struct task));
 	t->func=start_func;
@@ -273,6 +293,8 @@ int joinQ(mythread_t thr ) {
 
 void* sayHello() {
 	print("I say hello\n");
+	mythread_yield();
+	print("IN the grandest parent sayHello\n");
 	//exit(1);
 }
 
@@ -321,9 +343,10 @@ int main() {
 	mythread_create(&tid1,NULL,sayHello,NULL);
 	mythread_create(&tid2,NULL,sayHello2,NULL);
 	mythread_create(&tid3,NULL,sayHello3,NULL);
-	mythread_create(&tid1,NULL,sayHello,NULL);
+//	mythread_create(&tid1,NULL,sayHello,NULL);
 //	sleep(9);
 	mythread_create(&tid1,NULL,sayHello6,NULL);
+	print("All threads atleast enqueued\n");
 	while(1) {}
 //	waitpid(tid1,0,0);
 	
