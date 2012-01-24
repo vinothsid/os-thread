@@ -23,6 +23,8 @@
 #define CREATED 3
 
 #define STACK_SIZE 64*1024
+#define getMember(node,member) ((struct thread *)((node)->data))->member
+
 /* Keys for thread-specific data */
 typedef unsigned int mythread_key_t;
 typedef unsigned int mythread_t;
