@@ -23,7 +23,7 @@
 #define WAIT 2
 #define CREATED 3
 
-#define STACK_SIZE 64*1024
+#define STACK_SIZE 32*1024
 #define getMember(node,member) ((struct thread *)((node)->data))->member
 
 /* Keys for thread-specific data */
@@ -36,6 +36,7 @@ DNODE qHead, idleNode;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
 struct futex schedulerLock;
+struct futex mainLock;
 /* add your code here */
 
 struct thread {

@@ -10,6 +10,25 @@ int INIT_ONCE=1;
 DNODE qHead = NULL;
 DNODE idleNode = NULL;
 
+char* itoa(int val, int base){
+        static char buf[32] = {0};
+        int i = 30;
+        for(; val && i ; --i, val /= base)
+                buf[i] = "0123456789abcdef"[val % base];
+        return &buf[i+1];
+}
+/*
+mythread_join() 
+1. queueLock
+2. searchRunnable
+3. if qHead==idleNode set ALREADY_UP=1
+4. search for tid in queue
+5. Add self node ptr to this tid nodes' join Q
+6. set self state to WAIT
+7. wake up the RUNNABLE from step 2
+8. release queueLock i.e. futex_down(&queueLock)
+9. lock self Lock and wait to be awakened
+*/
 
 int mythread_yield() {
 	futex_down(&queueLock);
@@ -21,13 +40,15 @@ int mythread_yield() {
 	} else {
 		print("here in else\n");
 		//DNODE temp=qHead;
-		qHead=qHead->next;
+		//qHead=qHead->next;
+		qHead=searchRunnable();
 		if(qHead==idleNode)
 			ALREADY_UP=1; 
 		futex_up(&(getMember(qHead,selfLock)));
 		futex_up(&queueLock);
 		futex_down(&(getMember(temp,selfLock)));		
 	}
+	print("unblocked after yield\n");
 	return 0;
 }
 
@@ -98,7 +119,7 @@ int initThread() {
 	getMember(idleNode,state) = RUNNABLE;
 	qHead=idleNode;	
 	//char* idleStack=malloc(STACK_SIZE);
-	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM,0);
+	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM|CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO | CLONE_CHILD_CLEARTID,0);
 	//getMember(idleNode,threadId) = clone(idleFunc,idleStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
 //	char* schedStack=malloc(STACK_SIZE);
 //	mythread_t schedId=clone(scheduler,schedStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
@@ -137,17 +158,19 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	//end
 	//print("After initialising task\n");
 	
-	*new_thread_ID = clone(&mythread_wrapper,getMember(newNode,stackPtr)+STACK_SIZE,SIGCHLD|CLONE_VM,(void *)(t));
+	*new_thread_ID = clone(&mythread_wrapper,getMember(newNode,stackPtr)+STACK_SIZE,SIGCHLD|CLONE_VM |CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO|CLONE_CHILD_CLEARTID ,(void *)(t));
 
 	
 	//print("Wrapper cloned\n");	
 	futex_up(&queueLock);
+	futex_down(&mainLock);
 	return 0;
 }
 
 
 int mythread_wrapper(void *t) {
 	//print("Inside wrapper\n");
+	futex_up(&mainLock);
 	struct task* tWrapper=(struct task*)t;
 	getMember(tWrapper->qPos,threadId)=mythread_self();
 	getMember(tWrapper->qPos,state)=RUNNABLE;
@@ -160,7 +183,8 @@ int mythread_wrapper(void *t) {
 		futex_up(&(getMember(idleNode,selfLock)));
 		print("released idleNode lock\n");
 		//}
-	}	
+	}
+	print("releasing queueLock inside wrapper\n");	
 	futex_up(&queueLock);	
 	
 	futex_down(&(getMember(tWrapper->qPos,selfLock)));
@@ -176,9 +200,11 @@ int mythread_wrapper(void *t) {
 	//below ensures that idleNode lock is released only when 
 	//the only node remaining is idleNode;;
 	if(qHead->next!=qHead) {
+		ALREADY_UP=1;
 		futex_up(&getMember(idleNode,selfLock));
 		print("idleNode lock released in wrapper if condition\n");
 	}
+	print("node dequeued\n");
 	//qHead=qHead->next; //done in dequeu;
 	futex_up(&queueLock);
 	//futex_up(&schedulerLock);
@@ -298,25 +324,47 @@ int joinQ(mythread_t thr ) {
 
 }
 
+void* sayHello7788() {
+	print("I say hello7788\n");
+	//exit(1);
+}
 void* sayHello() {
-	print("I say hello\n");
-	mythread_yield();
-	print("IN the grandest parent sayHello\n");
+	//while(1) {
+		print("I say hello\n");
+		mythread_t tidx;
+		mythread_yield();
+		print("I say hello\n");
+	//}
+	//mythread_create(&tidx,NULL,sayHello7788,NULL);
+	//mythread_yield();
+	//print("IN the grandest parent sayHello\n");
+	//sleep(1);
 	//exit(1);
 }
 
 void* sayHello2() {
-	print("I say hello2\n");
+	//while(1) {
+		print("I say hello2\n");
+	//	mythread_yield();
+//		print("I say hello2\n");
+	//}
 }
 
 void* sayHello3() {
-	print("I say hello3\n");
+	//while(1) {
+		print("I say hello3\n");
+		mythread_yield();
+		print("I say hello3\n");
+	//}
 }
 
 void* sayHello6() {
 	print("I say hello66\n");
 	//exit(1);
 }
+
+
+
 int main() {
 	/*
 	DNODE node1 = createNode();
@@ -350,12 +398,14 @@ int main() {
 	mythread_create(&tid1,NULL,sayHello,NULL);
 	mythread_create(&tid2,NULL,sayHello2,NULL);
 	mythread_create(&tid3,NULL,sayHello3,NULL);
+/*
 //	mythread_create(&tid1,NULL,sayHello,NULL);
 //	sleep(9);
 	mythread_create(&tid1,NULL,sayHello6,NULL);
+*/
 	print("All threads atleast enqueued\n");
-	while(1) {}
+	//while(1) {}
 //	waitpid(tid1,0,0);
-	
+//	sleep(1);	
 }
 
