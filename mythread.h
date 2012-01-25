@@ -32,7 +32,7 @@ typedef unsigned int mythread_attr_t;
 typedef unsigned int mythread_t;
 typedef struct joinQNode *LNODE;
 
-DNODE qHead, idleNode;
+DNODE qHead, idleNode, mainNode;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
 struct futex schedulerLock;

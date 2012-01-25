@@ -9,6 +9,7 @@ int ALREADY_UP=0;
 int INIT_ONCE=1;
 DNODE qHead = NULL;
 DNODE idleNode = NULL;
+DNODE mainNode = NULL;
 
 char* itoa(int val, int base){
         static char buf[32] = {0};
@@ -29,13 +30,44 @@ mythread_join()
 8. release queueLock i.e. futex_down(&queueLock)
 9. lock self Lock and wait to be awakened
 */
-/*
-int mythread_join() {
-	futex_down(&queueLock);
-	qHead
 
+int mythread_join( mythread_t target_thread , void **status ) {
+	
+	if( getpid() == getMember(qHead,threadId) ) {
+//		assert()
+		futex_down(&queueLock);
+		if ( joinQ(target_thread) == -1 ) {
+			futex_up(&queueLock);
+			return 0;
+		}
+		DNODE tmp = qHead;
+
+		qHead = qHead->next;
+		qHead = searchRunnable();
+		
+		if (qHead == idleNode )
+			ALREADY_UP = 1;
+
+	//	DNODE tThread = search(target_thread);
+		getMember(tmp,state) = WAIT;	
+		futex_up(&(getMember(qHead,selfLock)));
+
+		futex_up(&queueLock);
+		futex_down(&(getMember(tmp,selfLock)));
+	} else {
+		futex_down(&queueLock);
+		if ( joinQ(target_thread) == -1 ) {
+			futex_up(&queueLock);
+                        return 0;
+
+		}
+		futex_up(&queueLock);
+		futex_down(&(getMember(mainNode,selfLock)));
+	}
+	return 0;
+	
 }
-*/
+
 int mythread_yield() {
 	futex_down(&queueLock);
 	DNODE temp=qHead;
@@ -123,7 +155,11 @@ int initThread() {
 	futex_up(&queueLock);
 	idleNode=createNode();
 	getMember(idleNode,state) = RUNNABLE;
-	qHead=idleNode;	
+	qHead=idleNode;
+
+	mainNode=createNode();
+	getMember(mainNode,threadId) = 0;
+	
 	//char* idleStack=malloc(STACK_SIZE);
 	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM|CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO | CLONE_CHILD_CLEARTID,0);
 	//getMember(idleNode,threadId) = clone(idleFunc,idleStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
@@ -196,12 +232,14 @@ int mythread_wrapper(void *t) {
 	futex_down(&(getMember(tWrapper->qPos,selfLock)));
 	print("Scheduler released the selfLock\n");
 	(tWrapper->func)(tWrapper->arg);
-	wake(); //works on the assumption that qHead points to self
-		//wake changes state from WAIT to RUNNABLE
-		//doesn't change the lock values and hence doesn't cause
-		//threads to run;;;;
-	//exit(1);
+
 	futex_down(&queueLock);
+        wake(); //works on the assumption that qHead points to self
+                //wake changes state from WAIT to RUNNABLE
+                //doesn't change the lock values and hence doesn't cause
+                //threads to run;;;;
+        //exit(1);
+
 	dequeue();
 	//below ensures that idleNode lock is released only when 
 	//the only node remaining is idleNode;;
@@ -289,9 +327,11 @@ int compareState(DNODE n,void *d) {
 */
 
 DNODE searchRunnable() {
-	if(qHead==idleNode)
-		return qHead->next;
 	int state = RUNNABLE;
+	if(qHead==idleNode) {
+		print("idleNode found in searchRunnable\n");
+		return find(qHead->next,compareState,(void *)&state) ;
+	}
 	return find(qHead,compareState,(void *)&state);
 }
 
@@ -324,6 +364,11 @@ int wake() {
 	while( p  != NULL) {
 
 		getMember(p->threadNode,state) = RUNNABLE;
+		if(getMember(p->threadNode,threadId) == 0 ) { //it is  main thread 
+			print("Releasing main lock\n");
+			futex_up(&(getMember(mainNode,selfLock)));
+			
+		}
 		p = p->next;
 
 	}
@@ -337,13 +382,26 @@ int wake() {
 int joinQ(mythread_t threadId ) {
 	DNODE targetThread = search( threadId );
 
-//	LNODE jQueue = getMember(qHead,joinQ);
+	if( targetThread == NULL ) 
+		return -1;
 
-	LNODE newNode = (LNODE) malloc(sizeof( struct joinQNode));
-	newNode->threadNode = targetThread;
-	newNode->next = getMember(qHead,joinQ);
-	getMember(qHead,joinQ) = newNode;
+	if( getpid() == getMember(qHead,threadId) ) {
+	        LNODE newNode = (LNODE) malloc(sizeof( struct joinQNode));
+	        newNode->threadNode =  qHead ;
+        	newNode->next = getMember(targetThread,joinQ);
 
+	        getMember(targetThread,joinQ) = newNode;
+
+	} else {
+	//	LNODE jQueue = getMember(qHead,joinQ);
+
+		LNODE newNode = (LNODE) malloc(sizeof( struct joinQNode));
+		newNode->threadNode =  mainNode ;
+		newNode->next = getMember(targetThread,joinQ);
+
+		getMember(targetThread,joinQ) = newNode;
+
+	}
 	return 0;
 /*
 	if (jQueue == NULL) {
@@ -359,12 +417,12 @@ void* sayHello7788() {
 	//exit(1);
 }
 void* sayHello() {
-	while(1) {
+//	while(1) {
 		print("I say hello\n");
 		mythread_t tidx;
 		mythread_yield();
-	//	print("I say hello\n");
-	}
+		print("I say hello\n");
+//	}
 	//mythread_create(&tidx,NULL,sayHello7788,NULL);
 	//mythread_yield();
 	//print("IN the grandest parent sayHello\n");
@@ -373,19 +431,19 @@ void* sayHello() {
 }
 
 void* sayHello2() {
-	while(1) {
+//	while(1) {
 		print("I say hello2\n");
 		mythread_yield();
-//		print("I say hello2\n");
-	}
+		print("I say hello2\n");
+//	}
 }
 
 void* sayHello3() {
-	while(1) {
+//	while(1) {
 		print("I say hello3\n");
 		mythread_yield();
-	//	print("I say hello3\n");
-	}
+		print("I say hello3\n");
+//	}
 }
 
 void* sayHello6() {
@@ -432,16 +490,22 @@ int main() {
 
 	int tid1,tid2,tid3;
 	mythread_create(&tid1,NULL,sayHello,NULL);
+	mythread_join(tid1,NULL);
 	mythread_create(&tid2,NULL,sayHello2,NULL);
+
+	int tmp;
+	mythread_join(tid2,NULL);
 	mythread_create(&tid3,NULL,sayHello3,NULL);
 
+	mythread_join(tid3,NULL);
+	
 /*
 //	mythread_create(&tid1,NULL,sayHello,NULL);
 //	sleep(9);
 	mythread_create(&tid1,NULL,sayHello6,NULL);
 */
 	print("All threads atleast enqueued\n");
-	//while(1) {}
+	while(1) {}
 //	waitpid(tid1,0,0);
 //	sleep(1);	
 }
