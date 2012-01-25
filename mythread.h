@@ -30,7 +30,7 @@
 typedef unsigned int mythread_key_t;
 typedef unsigned int mythread_attr_t;
 typedef unsigned int mythread_t;
-typedef unsigned int mythread_attr_t;
+typedef struct joinQNode *LNODE;
 
 DNODE qHead, idleNode;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
@@ -44,7 +44,7 @@ struct thread {
 	int threadId;
 	struct futex selfLock;
 	char* stackPtr; //needed to free stack later;
-	DNODE joinQ; //queue of threads waiting on this thread;
+	LNODE joinQ; //queue of threads waiting on this thread;
 	int exitStatus;
 };
 
@@ -53,6 +53,12 @@ struct task {
 	void *arg;    //arguments for user func;
 	DNODE qPos;//position in the thread queue; pointer to self;
 };
+
+struct joinQNode {
+        DNODE threadNode;
+        struct joinQNode *next;
+};
+
 /*
 *call to get process id or thread id
 */

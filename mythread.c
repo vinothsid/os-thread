@@ -29,7 +29,13 @@ mythread_join()
 8. release queueLock i.e. futex_down(&queueLock)
 9. lock self Lock and wait to be awakened
 */
+/*
+int mythread_join() {
+	futex_down(&queueLock);
+	qHead
 
+}
+*/
 int mythread_yield() {
 	futex_down(&queueLock);
 	DNODE temp=qHead;
@@ -40,7 +46,7 @@ int mythread_yield() {
 	} else {
 		print("here in else\n");
 		//DNODE temp=qHead;
-		//qHead=qHead->next;
+		qHead=qHead->next;
 		qHead=searchRunnable();
 		if(qHead==idleNode)
 			ALREADY_UP=1; 
@@ -314,14 +320,38 @@ int printQ() {
 */
 int wake() {
 
+	LNODE p = getMember(qHead,joinQ);
+	while( p  != NULL) {
+
+		getMember(p->threadNode,state) = RUNNABLE;
+		p = p->next;
+
+	}
+ 
 	return 0;
 }
 
 /*
-* Join the calling thread Node(pointed by head) to join Q of target thread 
+* Join the calling thread Node(pointed by head) to join Q of target thread .queueLock must be acquired before calling this function
 */
-int joinQ(mythread_t thr ) {
+int joinQ(mythread_t threadId ) {
+	DNODE targetThread = search( threadId );
 
+//	LNODE jQueue = getMember(qHead,joinQ);
+
+	LNODE newNode = (LNODE) malloc(sizeof( struct joinQNode));
+	newNode->threadNode = targetThread;
+	newNode->next = getMember(qHead,joinQ);
+	getMember(qHead,joinQ) = newNode;
+
+	return 0;
+/*
+	if (jQueue == NULL) {
+		getMember(qHead,joinQ) = (LNODE) malloc(sizeof( struct joinQNode));
+		
+	}
+*/	
+		
 }
 
 void* sayHello7788() {
@@ -329,12 +359,12 @@ void* sayHello7788() {
 	//exit(1);
 }
 void* sayHello() {
-	//while(1) {
+	while(1) {
 		print("I say hello\n");
 		mythread_t tidx;
 		mythread_yield();
-		print("I say hello\n");
-	//}
+	//	print("I say hello\n");
+	}
 	//mythread_create(&tidx,NULL,sayHello7788,NULL);
 	//mythread_yield();
 	//print("IN the grandest parent sayHello\n");
@@ -343,19 +373,19 @@ void* sayHello() {
 }
 
 void* sayHello2() {
-	//while(1) {
+	while(1) {
 		print("I say hello2\n");
-	//	mythread_yield();
+		mythread_yield();
 //		print("I say hello2\n");
-	//}
+	}
 }
 
 void* sayHello3() {
-	//while(1) {
+	while(1) {
 		print("I say hello3\n");
 		mythread_yield();
-		print("I say hello3\n");
-	//}
+	//	print("I say hello3\n");
+	}
 }
 
 void* sayHello6() {
@@ -366,38 +396,45 @@ void* sayHello6() {
 
 
 int main() {
-	/*
+
+/*	
 	DNODE node1 = createNode();
 	getMember(node1,threadId) = 1;
 	qHead = node1;
+	getMember(node1,state) = RUNNABLE;
 
 	DNODE node2 = createNode();
 	getMember(node2,threadId) = 2;
 	enqueue(node2);	
+	getMember(node2,state) = RUNNABLE;
 		
-	printQ();
 
 	DNODE foundNode = search(2);
-	printf("id of foundNode : %d \n" , getMember(foundNode,threadId));
+//	printf("id of foundNode : %d \n" , getMember(foundNode,threadId));
 
 	DNODE node3 = createNode();
 	getMember(node3,threadId) = 3;
 	getMember(node3,state) = RUNNABLE;
 	enqueue(node3);
 
+	qHead = qHead->next;
+	printQ();
 	foundNode  = searchRunnable();
-	printf("id of runnable Node : %d \n" , getMember(foundNode,threadId));
+	printf(" id of runnable Node : %d \n" , getMember(foundNode,threadId));
 
 	dequeue();
 	printQ();
 
 	dequeue();
 	printQ();
-	*/
+*/	
+
+
 	int tid1,tid2,tid3;
 	mythread_create(&tid1,NULL,sayHello,NULL);
 	mythread_create(&tid2,NULL,sayHello2,NULL);
 	mythread_create(&tid3,NULL,sayHello3,NULL);
+
 /*
 //	mythread_create(&tid1,NULL,sayHello,NULL);
 //	sleep(9);
