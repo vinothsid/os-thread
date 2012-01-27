@@ -44,7 +44,9 @@ int mythread_join( mythread_t target_thread , void **status ) {
 
 		qHead = qHead->next;
 		qHead = searchRunnable();
-		
+		//if search runnable returns idleNod
+		//below code ensures that idleNode is 
+		//not woken twice;;;	
 		if (qHead == idleNode )
 			ALREADY_UP = 1;
 
@@ -57,6 +59,7 @@ int mythread_join( mythread_t target_thread , void **status ) {
 	} else {
 		futex_down(&queueLock);
 		if ( joinQ(target_thread) == -1 ) {
+			//print("could not join queue\n");
 			futex_up(&queueLock);
                         return 0;
 
@@ -104,7 +107,6 @@ void mythread_exit(void* retVal) {
 int idleFunc() {
         DNODE toBeRun;
 	while(getppid()) {
-		//sleep(1);
 		print("In idle thread\n");
 		futex_down(&(getMember(idleNode,selfLock)));
 		print("In idle thread after idleNode lock release\n");
@@ -117,39 +119,11 @@ int idleFunc() {
 	
                 futex_up(&queueLock);
 	
-//		futex_up(&schedulerLock);
 		if(qHead==NULL)
 			print("QHEAD is null\n");
-//		futex_down(&(getMember(idleNode,selfLock)));
 	}
 	return 0;
 }
-/*
-int scheduler() {
-	DNODE toBeRun;
-	while(getppid()) {
-		print("In scheduler \n");
-		futex_down(&queueLock);
-		toBeRun=searchRunnable();
-		futex_up(&getMember(toBeRun,selfLock));
-		futex_up(&queueLock);
-		//print("Before selflock\n");
-		futex_down(&schedulerLock);
-		if(toBeRun != NULL) {
-			print("found RUNNABLE\n");	
-		//	print("after selflock\n");
-		} else {
-			print("to be run is null\n");	
-			futex_up(&(getMember(idleNode,selfLock)));
-			
-		}
-		//futex_down(&schedulerLock);
-	}
-	//do something here to ensure proper exit when main quits
-	//take care to ensure idle thread doesnot remain locked;;
-	return 0;
-}
-*/
 
 int initThread() {
 	futex_up(&queueLock);
@@ -160,11 +134,7 @@ int initThread() {
 	mainNode=createNode();
 	getMember(mainNode,threadId) = 0;
 	
-	//char* idleStack=malloc(STACK_SIZE);
 	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM|CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO | CLONE_CHILD_CLEARTID,0);
-	//getMember(idleNode,threadId) = clone(idleFunc,idleStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
-//	char* schedStack=malloc(STACK_SIZE);
-//	mythread_t schedId=clone(scheduler,schedStack+STACK_SIZE,SIGCHLD|CLONE_FILES|CLONE_FS|CLONE_VM,0);
 	return 0;	
 }
 
@@ -205,32 +175,30 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	
 	//print("Wrapper cloned\n");	
 	futex_up(&queueLock);
+	//need to lock main here so mythread_join can function properly 
+	//this lock will be released by the wrapper after fields necessary
+	//to perform join are populated inside wrapper;;;
 	futex_down(&mainLock);
 	return 0;
 }
 
 
 int mythread_wrapper(void *t) {
-	//print("Inside wrapper\n");
-	futex_up(&mainLock);
 	struct task* tWrapper=(struct task*)t;
 	getMember(tWrapper->qPos,threadId)=mythread_self();
 	getMember(tWrapper->qPos,state)=RUNNABLE;
+	futex_up(&mainLock);
 	futex_down(&queueLock);
-	print("wrapper acquired queueLock\n");	
 	if((qHead == idleNode) &&(!ALREADY_UP)) {
 		ALREADY_UP=1;
-		//if(qHead->next==idleNode) //{
-		//	qHead=tWrapper->qPos;
 		futex_up(&(getMember(idleNode,selfLock)));
 		print("released idleNode lock\n");
-		//}
 	}
-	print("releasing queueLock inside wrapper\n");	
+	//print("releasing queueLock inside wrapper\n");	
 	futex_up(&queueLock);	
 	
 	futex_down(&(getMember(tWrapper->qPos,selfLock)));
-	print("Scheduler released the selfLock\n");
+	//print("Scheduler released the selfLock\n");
 	(tWrapper->func)(tWrapper->arg);
 
 	futex_down(&queueLock);
@@ -238,17 +206,21 @@ int mythread_wrapper(void *t) {
                 //wake changes state from WAIT to RUNNABLE
                 //doesn't change the lock values and hence doesn't cause
                 //threads to run;;;;
-        //exit(1);
-
+	//dequeue() will make qHead point to the next node;
 	dequeue();
-	//below ensures that idleNode lock is released only when 
-	//the only node remaining is idleNode;;
+	//below code ensures that the idleNode is lock is released so that 
+	//it can schedule the next thread to run when the only node remaining is
+	//not the idleNode;;;
+	//when only idleNode remains no lock is released, instead wait for a new
+	//thread to be created to release this lock;;
+	//As a corollary, it is assumed that ALREADY_UP will be set to zero by the
+	//idleNode;; 
 	if(qHead->next!=qHead) {
 		ALREADY_UP=1;
 		futex_up(&getMember(idleNode,selfLock));
 		print("idleNode lock released in wrapper if condition\n");
 	}
-	print("node dequeued\n");
+	//print("node dequeued\n");
 	//qHead=qHead->next; //done in dequeu;
 	futex_up(&queueLock);
 	//futex_up(&schedulerLock);
