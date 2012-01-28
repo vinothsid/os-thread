@@ -22,7 +22,7 @@
 #define DEAD 0
 #define WAIT 2
 #define CREATED 3
-
+#define MAX_KEYS 128
 #define STACK_SIZE 32*1024
 #define getMember(node,member) ((struct thread *)((node)->data))->member
 
@@ -32,11 +32,23 @@ typedef unsigned int mythread_attr_t;
 typedef unsigned int mythread_t;
 typedef struct joinQNode *LNODE;
 
+typedef struct keyNode {
+        int sane; //value is 1 when key is valid
+        //mythread_key_t* keyAddress;
+} KEY_BLOCK;
+
+
+typedef void*  DATA;
+
+int LOWEST_VALID_KEY;
+
+KEY_BLOCK key_arr[MAX_KEYS];
+
 DNODE qHead, idleNode, mainNode;
 struct futex queueLock; //to ensure thread queue is not modified by two thread simultaneously;
 int INIT_ONCE;
-struct futex schedulerLock;
-struct futex mainLock;
+//struct futex schedulerLock;
+struct futex mainLock,exitLock;
 /* add your code here */
 
 struct thread {
@@ -44,6 +56,7 @@ struct thread {
 	int threadId;
 	struct futex selfLock;
 	char* stackPtr; //needed to free stack later;
+	DATA data_block[MAX_KEYS];
 	LNODE joinQ; //queue of threads waiting on this thread;
 	int exitStatus;
 };
@@ -70,6 +83,11 @@ static pid_t gettid(void);
 *initializes queueLock,scheduler thread and idle thread
 */
 int initThread();
+/*
+*sets all the keys as not sane in the global key control array
+*/
+
+void initKeyArr(void) ;
 /*
 *this function is used as a wrapper to call the user function
 */
