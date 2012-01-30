@@ -162,7 +162,7 @@ int initThread() {
 	getMember(mainNode,threadId) = 0;
 	futex_init(&mainLock,0);	
 	futex_init(&exitLock,0);	
-	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,SIGCHLD|CLONE_VM|CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO | CLONE_CHILD_CLEARTID,0);
+	getMember(idleNode,threadId) = clone(idleFunc,(getMember(idleNode,stackPtr))+STACK_SIZE,CLONE_VM|CLONE_FILES | CLONE_FS | CLONE_SIGHAND ,0);
 	return 0;	
 }
 
@@ -198,7 +198,7 @@ int mythread_create(mythread_t *new_thread_ID,mythread_attr_t *attr,void *(*star
 	//end
 	//print("After initialising task\n");
 	
-	*new_thread_ID = clone(&mythread_wrapper,getMember(newNode,stackPtr)+STACK_SIZE,SIGCHLD|CLONE_VM |CLONE_FILES | CLONE_FS | CLONE_SIGHAND | CLONE_IO|CLONE_CHILD_CLEARTID ,(void *)(t));
+	*new_thread_ID = clone(&mythread_wrapper,getMember(newNode,stackPtr)+STACK_SIZE, CLONE_VM |CLONE_FILES | CLONE_FS | CLONE_SIGHAND  ,(void *)(t));
 
 	
 	//futex_up(&queueLock);
