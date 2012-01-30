@@ -52,6 +52,9 @@ void deleteKey() {
 }
 void *yieldThread1() {
 	static int i = 1;
+
+	sleep(1); //Sleeping for 1 second so that the next thread joins the queue
+
 	printOut("Creating key1 in thread : ");
 	printOut(itoa(mythread_self(),10));
 	printOut("\n");
