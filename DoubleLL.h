@@ -1,7 +1,8 @@
 #include<stdio.h>
 #include<malloc.h>
 #include <string.h>
-#define print(string) write(2,string,strlen(string))
+#define print(string) ;
+//#define print(string) write(2,string,strlen(string))
 #define printOut(string) write(1,string,strlen(string))
 
 struct dllNode {

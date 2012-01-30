@@ -274,7 +274,8 @@ DNODE createNode(){
 	t->state = CREATED;
 	t->threadId = -1;
 	futex_init(&(t->selfLock),0);
-	t->stackPtr = (char *)malloc(STACK_SIZE);
+	t->tmp = (char *)malloc(STACK_SIZE +64);
+        t->stackPtr = (int)((char *)t->tmp+64) & ~0x03F;
 	t->joinQ = NULL;
 	t->exitStatus = -1;
 	memset(t->data_block,0,MAX_KEYS*sizeof(void*));
@@ -287,7 +288,15 @@ DNODE createNode(){
 */
 int dequeue() {
 	ZERO_THREADS--;
-	free(getMember(qHead,stackPtr));
+	LNODE p = getMember(qHead,joinQ);
+	LNODE tmp;
+	while(p!=NULL) {
+		tmp = p;
+		p = p->next;
+		free(tmp);
+	}
+
+	free(getMember(qHead,tmp));
 	free(qHead->data);
 	return dllDelete(qHead,&qHead);
 }
@@ -475,6 +484,8 @@ int mythread_key_delete(mythread_key_t key) {
 	}
 	
 }
+
+/*
 void* sayHello7788() {
 	print("I say hello7788\n");
 	//exit(1);
@@ -555,7 +566,7 @@ void* sayHello2() {
 
 
 int main() {
-/*
+
 	initKeyArr();
 	futex_up(&queueLock);
 	mythread_key_t testkey, testkey2;
@@ -636,7 +647,7 @@ int main() {
 	dequeue();
 	printQ();
 	
-*/
+
 	
 	int tid1,tid2,tid3;
 	mythread_create(&tid1,NULL,sayHello,NULL);
@@ -649,14 +660,15 @@ int main() {
 //	mythread_create(&tid3,NULL,sayHello3,NULL);
 
 //	mythread_join(tid3,NULL);
-/*
+
 //	mythread_create(&tid1,NULL,sayHello,NULL);
 //	sleep(9);
 	mythread_create(&tid1,NULL,sayHello6,NULL);
-*/
+
 	printOut("All threads atleast enqueued\n");
 	mythread_exit(NULL);
 //	waitpid(tid1,0,0);
 //	sleep(1);	
 }
+*/
 

@@ -55,7 +55,8 @@ struct thread {
 	int state; //CREATED,RUNNABLE, WAIT, DEAD;;
 	int threadId;
 	struct futex selfLock;
-	char* stackPtr; //needed to free stack later;
+	char* stackPtr; //proper 64byte aligned memory ;
+	char *tmp; // needed to free stack later;
 	DATA data_block[MAX_KEYS];
 	LNODE joinQ; //queue of threads waiting on this thread;
 	int exitStatus;
